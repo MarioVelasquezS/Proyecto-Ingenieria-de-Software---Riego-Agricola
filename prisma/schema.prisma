@@ -1,0 +1,116 @@
+// Esquema Prisma configurado con SQLite para compartir fácilmente en el repositorio
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./riego.db"
+}
+
+model User {
+  id               Int               @id @default(autoincrement())
+  username         String            @unique
+  fullName         String
+  email            String?           @unique
+  role             String            @default("OPERADOR")
+  active           Boolean           @default(true)
+  password         String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  irrigationEvents IrrigationEvent[]
+
+  @@map("users")
+}
+
+model SystemConfig {
+  id               Int      @id @default(1)
+  rainSensorActive Boolean  @default(false)
+  updatedAt        DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+model IrrigationZone {
+  id                   Int               @id @default(autoincrement())
+  name                 String
+  cropType             String
+  areaHectares         Float             @default(1.0)
+  latitude             Float
+  longitude            Float
+  minMoisture          Float             @default(35)
+  maxMoisture          Float             @default(70)
+  currentMoisture      Float             @default(50)
+  valveOpen            Boolean           @default(false)
+  autoMode             Boolean           @default(true)
+  rainBlockEnabled     Boolean           @default(true)
+  flowRateLpm          Float             @default(25)
+  sprinklerCount       Int                  @default(4)
+  maxIrrigationSeconds Int                  @default(1800)
+  activeMaxSeconds     Int?
+  irrigationStartedAt  DateTime?
+  cooldownUntil        DateTime?
+  active               Boolean              @default(true)
+  lastReadingAt        DateTime             @default(now())
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  readings             MoistureReading[]
+  events               IrrigationEvent[]
+  schedules            IrrigationSchedule[]
+
+  @@map("irrigation_zones")
+}
+
+model IrrigationSchedule {
+  id              Int            @id @default(autoincrement())
+  zoneId          Int
+  label           String         @default("Riego programado")
+  startTime       String
+  durationSeconds Int            @default(900)
+  daysOfWeek      String         @default("1,2,3,4,5,6,0")
+  climateAdjust   Boolean        @default(true)
+  enabled         Boolean        @default(true)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  zone            IrrigationZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId, enabled])
+  @@map("irrigation_schedules")
+}
+
+model MoistureReading {
+  id               Int            @id @default(autoincrement())
+  zoneId           Int
+  moisture         Float
+  ambientTemp      Float
+  airHumidity      Float
+  rainProbability  Float          @default(0)
+  windSpeedKmh     Float          @default(8)
+  forecastRainProb Float          @default(10)
+  status           String
+  valveOpen        Boolean
+  source           String         @default("SIMULACION")
+  recordedAt       DateTime       @default(now())
+  zone             IrrigationZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId, recordedAt])
+  @@map("moisture_readings")
+}
+
+model IrrigationEvent {
+  id              Int            @id @default(autoincrement())
+  zoneId          Int
+  action          String
+  reason          String
+  moistureAtEvent Float
+  waterUsedLiters Float          @default(0)
+  userId          Int?
+  createdAt       DateTime       @default(now())
+  zone            IrrigationZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  user            User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([zoneId, createdAt])
+  @@map("irrigation_events")
+}
