@@ -13,6 +13,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { classifyMoistureStatus } from "@/lib/irrigation-engine";
 import { AppShell } from "@/components/AppShell";
+import { WaterTankMonitor } from "@/components/WaterTankMonitor";
 
 export const dynamic = "force-dynamic";
 
@@ -150,6 +151,12 @@ export default async function HomePage() {
             </p>
           </div>
         </div>
+
+        <WaterTankMonitor
+          currentLevel={24500}
+          zoneId="1"
+          isSimulationMode={true}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3">
