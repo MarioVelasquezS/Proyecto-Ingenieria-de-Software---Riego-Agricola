@@ -27,3 +27,5 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 
+prisma/riego.db
+prisma/riego.db
