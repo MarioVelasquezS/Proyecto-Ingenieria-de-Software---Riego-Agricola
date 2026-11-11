@@ -25,6 +25,7 @@ import { isScheduleDueNow } from "@/lib/schedule-utils";
 import type { WeatherPreset } from "@/lib/weather";
 import type { IrrigationEventRecord, ZoneRecord } from "@/lib/zone-types";
 import { ScheduleModal } from "./ScheduleModal";
+import { WaterTankMonitor } from "./WaterTankMonitor";
 import { ZoneCard } from "./ZoneCard";
 
 interface IrrigationDashboardProps {
@@ -52,6 +53,10 @@ const ACTION_BADGE_MAP: Record<
   VALVE_CLOSE_TIMEOUT: {
     label: "Fin por cronómetro",
     className: "bg-rose-50 text-rose-800 border-rose-200",
+  },
+  VALVE_CLOSE_CRITICAL_TANK: {
+    label: "Corte tanque crítico",
+    className: "bg-red-50 text-red-800 border-red-200",
   },
   VALVE_CLOSE_RAIN: {
     label: "Apagado por lluvia",
@@ -101,6 +106,7 @@ export function IrrigationDashboard({
   const [simulating, setSimulating] = useState(false);
   const simulatingRef = useRef(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [tankWaterLevel, setTankWaterLevel] = useState<number>(24500);
   const watchdogTriggeredRef = useRef<Set<string>>(new Set());
   const scheduleCheckRef = useRef<string>("");
   const [scheduleZoneId, setScheduleZoneId] = useState<number | null>(null);
@@ -214,6 +220,11 @@ export function IrrigationDashboard({
         try {
           const response = await fetch(`/api/zones/${zone.id}/watchdog`, {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: "OFF",
+              reason: "MAX_TIME_REACHED",
+            }),
           });
           if (!response.ok) return;
           const data = await response.json().catch(() => ({}));
@@ -338,6 +349,13 @@ export function IrrigationDashboard({
 
   async function handleToggleValve(zone: ZoneRecord) {
     setFeedback(null);
+    if (!zone.valveOpen && tankWaterLevel <= 5000) {
+      setFeedback({
+        type: "error",
+        text: "Protección hidráulica activa: el reservorio principal está en nivel crítico (<= 5,000 L). No es posible abrir válvulas.",
+      });
+      return;
+    }
     const response = await fetch(`/api/zones/${zone.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -626,6 +644,22 @@ export function IrrigationDashboard({
           </p>
         </div>
       </div>
+
+      {/* Monitor de Tanque de Agua Principal */}
+      <WaterTankMonitor
+        currentLevel={tankWaterLevel}
+        zoneId={zones[0] ? String(zones[0].id) : "1"}
+        isSimulationMode={true}
+        onLevelChange={setTankWaterLevel}
+        onWatchdogTriggered={() => {
+          setFeedback({
+            type: "error",
+            text: "Corte de emergencia activado: el tanque llegó a nivel crítico (<= 5,000 L). Válvulas bloqueadas.",
+          });
+          void refreshState();
+          router.refresh();
+        }}
+      />
 
       {/* Filtros de zonas */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row gap-3">
